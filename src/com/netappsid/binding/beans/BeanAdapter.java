@@ -24,8 +24,10 @@ public class BeanAdapter extends Bean
 	private final Map<String, SimplePropertyAdapter> propertyAdapters;
 	private final Map<String, CollectionValueModel> collectionValueModels;
 	private final IndirectPropertyChangeSupport indirectChangeSupport;
-	private final PropertyChangeListener propertyChangeHandler;
+	private PropertyChangeListener propertyChangeHandler;
+	private BeanChangeHandler beanChangeHandler;
 	private Object storedOldBean;
+	private boolean disposed = false;
 
 	public BeanAdapter(ChangeSupportFactory changeSupportFactory, ObservableCollectionSupportFactory observableCollectionSupportFactory, Class<?> beanClass)
 	{
@@ -49,8 +51,9 @@ public class BeanAdapter extends Bean
 		this.propertyAdapters = new HashMap<String, SimplePropertyAdapter>();
 		this.collectionValueModels = new HashMap<String, CollectionValueModel>();
 		this.indirectChangeSupport = new IndirectPropertyChangeSupport(this.beanChannel);
-		this.propertyChangeHandler = new PropertyChangeHandler();
-		this.beanChannel.addValueChangeListener(new BeanChangeHandler());
+		this.propertyChangeHandler = new PropertyChangeHandler(this);
+		this.beanChangeHandler = new BeanChangeHandler(this);
+		this.beanChannel.addValueChangeListener(beanChangeHandler);
 		this.storedOldBean = getBean();
 
 		checkBeanChannelIdentityCheck(this.beanChannel);
@@ -170,6 +173,7 @@ public class BeanAdapter extends Bean
 		}
 
 		indirectChangeSupport.removeAll();
+		removeChangeHandlerFrom(storedOldBean);
 	}
 
 	private void addChangeHandlerTo(Object bean)
@@ -195,7 +199,7 @@ public class BeanAdapter extends Bean
 
 	private void removeChangeHandlerFrom(Object bean)
 	{
-		if (bean != null)
+		if (bean != null && propertyChangeHandler != null)
 		{
 			BeanUtils.removePropertyChangeListener(bean, bean.getClass(), propertyChangeHandler);
 		}
@@ -214,38 +218,57 @@ public class BeanAdapter extends Bean
 		return collectionValueModels;
 	}
 
-	private final class BeanChangeHandler implements PropertyChangeListener
+	private static final class BeanChangeHandler implements PropertyChangeListener
 	{
+		private BeanAdapter beanAdapter;
+
+		public BeanChangeHandler(BeanAdapter beanAdapter)
+		{
+			this.beanAdapter = beanAdapter;
+		}
+
 		@Override
 		public void propertyChange(PropertyChangeEvent evt)
 		{
-			final Object newBean = evt.getNewValue() != null ? evt.getNewValue() : getBean();
+			final Object newBean = evt.getNewValue() != null ? evt.getNewValue() : beanAdapter.getBean();
 
-			setBean(storedOldBean, newBean);
-			storedOldBean = newBean;
+			setBean(beanAdapter.storedOldBean, newBean);
+			beanAdapter.storedOldBean = newBean;
 		}
 
 		private void setBean(Object oldBean, Object newBean)
 		{
-			fireIdentityPropertyChange(PROPERTYNAME_BEFORE_BEAN, oldBean, newBean);
-			removeChangeHandlerFrom(oldBean);
+			beanAdapter.fireIdentityPropertyChange(PROPERTYNAME_BEFORE_BEAN, oldBean, newBean);
+			beanAdapter.removeChangeHandlerFrom(oldBean);
 			forwardAllAdaptedValuesChanged(oldBean, newBean);
-			addChangeHandlerTo(newBean);
-			fireIdentityPropertyChange(PROPERTYNAME_BEAN, oldBean, newBean);
-			fireIdentityPropertyChange(PROPERTYNAME_AFTER_BEAN, oldBean, newBean);
+			beanAdapter.addChangeHandlerTo(newBean);
+			beanAdapter.fireIdentityPropertyChange(PROPERTYNAME_BEAN, oldBean, newBean);
+			beanAdapter.fireIdentityPropertyChange(PROPERTYNAME_AFTER_BEAN, oldBean, newBean);
 		}
 
 		private void forwardAllAdaptedValuesChanged(Object oldBean, Object newBean)
 		{
-			for (SimplePropertyAdapter adapter : Lists.newArrayList(propertyAdapters.values()))
+			for (SimplePropertyAdapter adapter : Lists.newArrayList(beanAdapter.propertyAdapters.values()))
 			{
 				adapter.setBean(oldBean, newBean);
 			}
 		}
+
+		public void dispose()
+		{
+			beanAdapter = null;
+		}
 	}
 
-	private final class PropertyChangeHandler implements PropertyChangeListener
+	private static final class PropertyChangeHandler implements PropertyChangeListener
 	{
+		private BeanAdapter beanAdapter;
+
+		public PropertyChangeHandler(BeanAdapter beanAdapter)
+		{
+			this.beanAdapter = beanAdapter;
+		}
+
 		@Override
 		public void propertyChange(PropertyChangeEvent evt)
 		{
@@ -255,7 +278,7 @@ public class BeanAdapter extends Bean
 			}
 			else
 			{
-				final AbstractValueModel adapter = propertyAdapters.get(evt.getPropertyName());
+				final AbstractValueModel adapter = beanAdapter.propertyAdapters.get(evt.getPropertyName());
 
 				if (adapter != null)
 				{
@@ -266,12 +289,54 @@ public class BeanAdapter extends Bean
 
 		private void forwardAllAdaptedValuesChanged()
 		{
-			final Object currentBean = getBean();
+			final Object currentBean = beanAdapter.getBean();
 
-			for (SimplePropertyAdapter adapter : Lists.newArrayList(propertyAdapters.values()))
+			for (SimplePropertyAdapter adapter : Lists.newArrayList(beanAdapter.propertyAdapters.values()))
 			{
 				adapter.fireChange(currentBean);
 			}
+		}
+
+		public void dispose()
+		{
+			beanAdapter = null;
+		}
+	}
+
+	public void dispose()
+	{
+		if (!disposed)
+		{
+			for (Object adapter : propertyAdapters.values().toArray())
+			{
+				((SimplePropertyAdapter) adapter).dispose();
+			}
+			propertyAdapters.clear();
+			collectionValueModels.clear();
+
+			if (storedOldBean instanceof BeanAdapter)
+			{
+				((BeanAdapter) storedOldBean).dispose();
+			}
+
+			if (propertyChangeHandler != null)
+			{
+				((PropertyChangeHandler) propertyChangeHandler).dispose();
+				propertyChangeHandler = null;
+			}
+
+			if (beanChangeHandler != null)
+			{
+				beanChangeHandler.dispose();
+				beanChangeHandler = null;
+			}
+
+			if (storedOldBean != null && storedOldBean instanceof BeanAdapter)
+			{
+				((BeanAdapter) storedOldBean).dispose();
+			}
+			storedOldBean = null;
+			disposed = true;
 		}
 	}
 
