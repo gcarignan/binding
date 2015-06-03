@@ -214,4 +214,11 @@ public class DynamicPresentationModel extends PresentationModel
 	{
 		this.valueModelFactory = valueModelFactory;
 	}
+
+	@Override
+	public void dispose()
+	{
+		// TODO Auto-generated method stub
+
+	}
 }

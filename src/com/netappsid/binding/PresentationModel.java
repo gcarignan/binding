@@ -363,4 +363,6 @@ public abstract class PresentationModel extends Bean
 	{
 		return observableCollectionSupportFactory;
 	}
+
+	public abstract void dispose();
 }

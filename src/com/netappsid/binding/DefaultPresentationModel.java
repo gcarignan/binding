@@ -24,11 +24,12 @@ public class DefaultPresentationModel extends PresentationModel
 {
 	public static final String PROPERTYNAME_BEAN = "bean";
 
+	private boolean disposed = false;
 	private final BeanAdapter beanAdapter;
 	private final StateModel stateModel;
+	private UndoRedoManager undoRedoManager;
 
-	private final UndoRedoManager undoRedoManager;
-
+	private BeanChangeHandler beanChangeHandler;
 	private UpdateStateOnBeanPropertyChangeHandler stateUpdaterOnBeanPropertyChange;
 
 	public DefaultPresentationModel(ChangeSupportFactory changeSupportFactory, ObservableCollectionSupportFactory observableCollectionSupportFactory,
@@ -64,7 +65,8 @@ public class DefaultPresentationModel extends PresentationModel
 		this.stateModel = new StateModel(changeSupportFactory);
 
 		setBeanClass(beanClass);
-		beanAdapter.addPropertyChangeListener(BeanAdapter.PROPERTYNAME_BEAN, new BeanChangeHandler());
+		beanChangeHandler = new BeanChangeHandler();
+		beanAdapter.addPropertyChangeListener(BeanAdapter.PROPERTYNAME_BEAN, beanChangeHandler);
 		stateUpdaterOnBeanPropertyChange = new UpdateStateOnBeanPropertyChangeHandler(this.stateModel);
 		beanAdapter.addBeanPropertyChangeListener(stateUpdaterOnBeanPropertyChange);
 	}
@@ -198,6 +200,30 @@ public class DefaultPresentationModel extends PresentationModel
 			{
 				stateModel.setState(State.DIRTY);
 			}
+		}
+	}
+
+	@Override
+	public void dispose()
+	{
+		if (!disposed)
+		{
+			for (PresentationModel subModel : getSubModels().values())
+			{
+				subModel.dispose();
+			}
+
+			getSubModels().clear();
+
+			undoRedoManager = null;
+
+			beanAdapter.removeBeanPropertyChangeListener(stateUpdaterOnBeanPropertyChange);
+			beanAdapter.removePropertyChangeListener(BeanAdapter.PROPERTYNAME_BEAN, beanChangeHandler);
+			beanAdapter.release();
+			beanAdapter.dispose();
+			stateUpdaterOnBeanPropertyChange = null;
+			beanChangeHandler = null;
+			disposed = true;
 		}
 	}
 }
