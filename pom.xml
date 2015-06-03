@@ -12,7 +12,7 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>com.netappsid.binding</artifactId>
-	<version>3.1.1-SNAPSHOT</version>
+	<version>3.1.1</version>
 
 	<packaging>bundle</packaging>
 
@@ -20,7 +20,8 @@
 		<connection>scm:git:git@github.com:360-Innovations/binding.git</connection>
 		<url>scm:git:git@github.com:360-Innovations/binding.git</url>
 		<developerConnection>scm:git:ssh://git@github.com/360-Innovations/binding.git</developerConnection>
-	</scm>
+	  <tag>v3.1.1</tag>
+  </scm>
 
 	<build>
 		<sourceDirectory>src</sourceDirectory>
