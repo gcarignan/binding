@@ -307,10 +307,6 @@ public class BeanAdapter extends Bean
 	{
 		if (!disposed)
 		{
-			for (Object adapter : propertyAdapters.values().toArray())
-			{
-				((SimplePropertyAdapter) adapter).dispose();
-			}
 			propertyAdapters.clear();
 			collectionValueModels.clear();
 
