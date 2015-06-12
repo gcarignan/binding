@@ -13,16 +13,6 @@ import com.netappsid.observable.ObservableByName;
 
 public class UndoRedoValueModel<T extends ValueModel & Observable> implements BoundValueModel, ObservableByName, ReinitializableValueModel
 {
-	private final class DelegateValueModelValueChangeListener implements PropertyChangeListener
-	{
-		@Override
-		public void propertyChange(PropertyChangeEvent event)
-		{
-			propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(UndoRedoValueModel.this, event.getPropertyName(), event.getOldValue(), event
-					.getNewValue()));
-		}
-	}
-
 	private final T valueModel;
 	private final UndoRedoManager undoRedoManager;
 	private final IdentityPropertyChangeSupport propertyChangeSupport;
@@ -147,5 +137,15 @@ public class UndoRedoValueModel<T extends ValueModel & Observable> implements Bo
 		}
 
 		return BoundValueModel.UNKNOWN_PROPERTY;
+	}
+
+	private final class DelegateValueModelValueChangeListener implements PropertyChangeListener
+	{
+		@Override
+		public void propertyChange(PropertyChangeEvent event)
+		{
+			propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(UndoRedoValueModel.this, event.getPropertyName(), event.getOldValue(), event
+					.getNewValue()));
+		}
 	}
 }

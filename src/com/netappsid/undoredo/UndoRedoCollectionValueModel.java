@@ -19,20 +19,6 @@ import com.netappsid.observable.ObservableCollectionSupportFactory;
 
 public class UndoRedoCollectionValueModel<E, T extends CollectionValueModel<E> & Observable> extends UndoRedoValueModel<T> implements CollectionValueModel<E>
 {
-	protected final class DelegateCollectionValueModelCollectionChangeListener implements CollectionChangeListener
-	{
-		@Override
-		public void onCollectionChange(CollectionChangeEvent event)
-		{
-			if (trackingEnabled)
-			{
-				getUndoRedoManager().push(new CollectionChangeOperation(UndoRedoCollectionValueModel.this, event));
-			}
-			CollectionChangeEvent newCollectionChangeEvent = observableCollectionSupport.newCollectionChangeEvent(event.getDifference());
-			observableCollectionSupport.fireCollectionChangeEvent(newCollectionChangeEvent);
-		}
-	}
-
 	private final ObservableCollectionSupport observableCollectionSupport;
 	private final CollectionChangeListener collectionChangeHandler;
 	private boolean trackingEnabled = true;
@@ -53,12 +39,12 @@ public class UndoRedoCollectionValueModel<E, T extends CollectionValueModel<E> &
 	{
 		trackingEnabled = true;
 	}
-	
+
 	public void disableCollectionTracking()
 	{
-		trackingEnabled = false;		
+		trackingEnabled = false;
 	}
-		
+
 	protected CollectionChangeListener getUndoRedoManagerPushHandler()
 	{
 		return collectionChangeHandler;
@@ -288,6 +274,20 @@ public class UndoRedoCollectionValueModel<E, T extends CollectionValueModel<E> &
 		if (valueModel != null)
 		{
 			valueModel.removeCollectionChangeListener(collectionChangeHandler);
+		}
+	}
+
+	protected final class DelegateCollectionValueModelCollectionChangeListener implements CollectionChangeListener
+	{
+		@Override
+		public void onCollectionChange(CollectionChangeEvent event)
+		{
+			if (trackingEnabled)
+			{
+				getUndoRedoManager().push(new CollectionChangeOperation(UndoRedoCollectionValueModel.this, event));
+			}
+			CollectionChangeEvent newCollectionChangeEvent = observableCollectionSupport.newCollectionChangeEvent(event.getDifference());
+			observableCollectionSupport.fireCollectionChangeEvent(newCollectionChangeEvent);
 		}
 	}
 }

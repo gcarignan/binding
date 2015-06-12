@@ -25,7 +25,7 @@ public class DefaultPresentationModel extends PresentationModel
 	public static final String PROPERTYNAME_BEAN = "bean";
 
 	private boolean disposed = false;
-	private final BeanAdapter beanAdapter;
+	private BeanAdapter beanAdapter;
 	private final StateModel stateModel;
 	private UndoRedoManager undoRedoManager;
 
@@ -65,7 +65,7 @@ public class DefaultPresentationModel extends PresentationModel
 		this.stateModel = new StateModel(changeSupportFactory);
 
 		setBeanClass(beanClass);
-		beanChangeHandler = new BeanChangeHandler();
+		beanChangeHandler = new BeanChangeHandler(this);
 		beanAdapter.addPropertyChangeListener(BeanAdapter.PROPERTYNAME_BEAN, beanChangeHandler);
 		stateUpdaterOnBeanPropertyChange = new UpdateStateOnBeanPropertyChangeHandler(this.stateModel);
 		beanAdapter.addBeanPropertyChangeListener(stateUpdaterOnBeanPropertyChange);
@@ -161,19 +161,38 @@ public class DefaultPresentationModel extends PresentationModel
 		return undoRedoManager;
 	}
 
-	/**
-	 * Responsible for bubbling bean change events to listeners on the PresentationModel.
-	 * 
-	 * @author Eric Belanger
-	 * @author NetAppsID Inc.
-	 * @version $Revision: 1.16 $
-	 */
-	private final class BeanChangeHandler implements PropertyChangeListener
+	@Override
+	public void dispose()
 	{
-		@Override
-		public void propertyChange(PropertyChangeEvent evt)
+		if (!disposed)
 		{
-			fireIdentityPropertyChange(PROPERTYNAME_BEAN, evt.getOldValue(), evt.getNewValue());
+			disposed = true;
+
+			for (PresentationModel subModel : getSubModels().values())
+			{
+				subModel.dispose();
+			}
+
+			getSubModels().clear();
+
+			undoRedoManager = null;
+
+			beanAdapter.removeBeanPropertyChangeListener(stateUpdaterOnBeanPropertyChange);
+			beanAdapter.removePropertyChangeListener(BeanAdapter.PROPERTYNAME_BEAN, beanChangeHandler);
+			beanAdapter.release();
+			beanAdapter.dispose();
+			beanAdapter = null;
+
+			if (stateUpdaterOnBeanPropertyChange != null)
+			{
+				stateUpdaterOnBeanPropertyChange.dispose();
+				stateUpdaterOnBeanPropertyChange = null;
+			}
+			if (beanChangeHandler != null)
+			{
+				beanChangeHandler.dispose();
+				beanChangeHandler = null;
+			}
 		}
 	}
 
@@ -185,7 +204,7 @@ public class DefaultPresentationModel extends PresentationModel
 	 */
 	public static class UpdateStateOnBeanPropertyChangeHandler implements PropertyChangeListener
 	{
-		private final StateModel stateModel;
+		private StateModel stateModel;
 
 		public UpdateStateOnBeanPropertyChangeHandler(StateModel stateModel)
 		{
@@ -201,29 +220,38 @@ public class DefaultPresentationModel extends PresentationModel
 				stateModel.setState(State.DIRTY);
 			}
 		}
+
+		public void dispose()
+		{
+			stateModel = null;
+		}
 	}
 
-	@Override
-	public void dispose()
+	/**
+	 * Responsible for bubbling bean change events to listeners on the PresentationModel.
+	 * 
+	 * @author Eric Belanger
+	 * @author NetAppsID Inc.
+	 * @version $Revision: 1.16 $
+	 */
+	private static final class BeanChangeHandler implements PropertyChangeListener
 	{
-		if (!disposed)
+		private DefaultPresentationModel defaultPresentationModel;
+
+		public BeanChangeHandler(DefaultPresentationModel defaultPresentationModel)
 		{
-			for (PresentationModel subModel : getSubModels().values())
-			{
-				subModel.dispose();
-			}
+			this.defaultPresentationModel = defaultPresentationModel;
+		}
 
-			getSubModels().clear();
+		@Override
+		public void propertyChange(PropertyChangeEvent evt)
+		{
+			defaultPresentationModel.fireIdentityPropertyChange(PROPERTYNAME_BEAN, evt.getOldValue(), evt.getNewValue());
+		}
 
-			undoRedoManager = null;
-
-			beanAdapter.removeBeanPropertyChangeListener(stateUpdaterOnBeanPropertyChange);
-			beanAdapter.removePropertyChangeListener(BeanAdapter.PROPERTYNAME_BEAN, beanChangeHandler);
-			beanAdapter.release();
-			beanAdapter.dispose();
-			stateUpdaterOnBeanPropertyChange = null;
-			beanChangeHandler = null;
-			disposed = true;
+		public void dispose()
+		{
+			defaultPresentationModel = null;
 		}
 	}
 }
